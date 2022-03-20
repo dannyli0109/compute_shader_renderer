@@ -31,6 +31,9 @@ glm::mat4 GetModelMatrix(float rotation_angle)
     scale[1][1] = 2.5f;
     scale[2][2] = 2.5f;
 
+    //glm::mat4 translate(1.0f);
+    //translate[3] = glm::vec4(transform, 1);
+
 
     return rotation * scale;
 }
@@ -98,9 +101,9 @@ int Program::Init()
     InitFrameBuffer(w, h);
     InitSSBO();
     InitModes();
-    LoadTexture("diffuseTexture", "soulspear\\soulspear_diffuse.tga");
-    LoadTexture("normalTexture", "soulspear\\soulspear_normal.tga");
-    LoadTexture("specularTexture", "soulspear\\soulspear_specular.tga");
+    LoadTexture(Textures::DiffuseTexture, "soulspear\\soulspear_diffuse.tga");
+    LoadTexture(Textures::NormalTexture, "soulspear\\soulspear_normal.tga");
+    LoadTexture(Textures::SpecularTexture, "soulspear\\soulspear_specular.tga");
 
     Light l1 = Light{ {20, 20, 20}, {500, 500, 500} };
     Light l2 = Light{ {-20, 20, 0}, {500, 500, 500} };
@@ -112,7 +115,6 @@ int Program::Init()
 
 void Program::Update()
 {
-    int angles = 0;
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
@@ -126,96 +128,16 @@ void Program::Update()
             angles += 5;
         }
 
-        glClear(GL_COLOR_BUFFER_BIT);
-
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         {
-            glUseProgram(clearProgram);
-            int operations = w * h;
-            int processes = 8 * 8;
-            int dimension = ceil(sqrt(operations / processes));
-            glUniform1i(glGetUniformLocation(clearProgram, "dimension"), dimension);
-            glBindImageTexture(0, frameBufferTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, depthBuffer);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, depthBuffer);
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glDispatchCompute(dimension, dimension, 1);
-            glMemoryBarrier(GL_ALL_BARRIER_BITS);
+            transform.z -= 1;
         }
 
-
-        glUseProgram(rendererProgram);
-        // this can be done in another compute shader
-        glBindImageTexture(0, frameBufferTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-
-        glBindTexture(GL_TEXTURE_2D, textures["diffuseTexture"]);
-        glad_glBindTextureUnit(1, textures["diffuseTexture"]);
-        glUniform1i(glGetUniformLocation(rendererProgram, "diffuseTexture"), 1);
-
-        glBindTexture(GL_TEXTURE_2D, textures["specularTexture"]);
-        glad_glBindTextureUnit(2, textures["specularTexture"]);
-        glUniform1i(glGetUniformLocation(rendererProgram, "specularTexture"), 2);
-
-        glBindTexture(GL_TEXTURE_2D, textures["normalTexture"]);
-        glad_glBindTextureUnit(3, textures["normalTexture"]);
-        glUniform1i(glGetUniformLocation(rendererProgram, "normalTexture"), 3);
-        glBindTexture(GL_TEXTURE_2D, 0);
-
-        for (int i = 0; i < lights.size(); i++)
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
         {
-            std::string s = "lights[";
-            s += std::to_string(i);
-            s += "].position";
-            glUniform3fv(glGetUniformLocation(rendererProgram, s.c_str()), 1, &lights[i].position.x);
-            s = "lights[";
-            s += std::to_string(i);
-            s += "].intensity";
-            glUniform3fv(glGetUniformLocation(rendererProgram, s.c_str()), 1, &lights[i].intensity.x);
+            transform.z += 1;
         }
-        glUniform1i(glGetUniformLocation(rendererProgram, "lightCount"), lights.size());
 
-       
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, depthBuffer);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, depthBuffer);
-
-        for (int i = 0; i < models.size(); i++)
-        {
-            glm::vec3 eyePos = { 0, 5, 20 };
-            glUniform3fv(glGetUniformLocation(rendererProgram, "eyePosition"), 1, &eyePos.x);
-
-            glm::mat4 model = GetModelMatrix(angles);
-            glUniformMatrix4fv(glGetUniformLocation(rendererProgram, "model"), 1, GL_FALSE, &model[0][0]);
-            glm::mat4 view = GetViewMatrix(eyePos);
-            glUniformMatrix4fv(glGetUniformLocation(rendererProgram, "view"), 1, GL_FALSE, &view[0][0]);
-            glm::mat4 projection = GetProjectionMatrix(45, (float)w/(float)h, 0.1, 50);
-            glUniformMatrix4fv(glGetUniformLocation(rendererProgram, "projection"), 1, GL_FALSE, &projection[0][0]);
-
-            glm::ivec2 size = glm::ivec2(w, h);
-            glUniform2iv(glGetUniformLocation(rendererProgram, "size"), 1, &size.x);
-
-            for (int j = 0; j < models[i]->meshes.size(); j++)
-            {
-                //glBindImageTexture(1, depthBufferTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-                int operations = models[i]->meshes[j].indices.size() / 3;
-                int processes = 8 * 8;
-                int dimension = ceil(sqrt(operations / processes));
-                glUniform1i(glGetUniformLocation(rendererProgram, "dimension"), dimension);
-
-                //std::cout << dimension << std::endl;
-
-                glBindBuffer(GL_SHADER_STORAGE_BUFFER, vertexBuffer);
-                glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Vertex) * models[i]->meshes[j].vertices.size(), &models[i]->meshes[j].vertices[0], GL_STATIC_DRAW); //sizeof(data) only works for statically sized C/C++ arrays.
-
-                glBindBuffer(GL_SHADER_STORAGE_BUFFER, indexBuffer);
-                glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Index) * models[i]->meshes[j].indices.size(), &models[i]->meshes[j].indices[0], GL_STATIC_DRAW); //sizeof(data) only works for statically sized C/C++ arrays.
-                
-                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, vertexBuffer);
-                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, indexBuffer);
-                glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
-                glDispatchCompute(dimension, dimension, 1);
-                //glMemoryBarrier(a);
-            }
-        }
 
         Draw();
         glfwSwapBuffers(window);
@@ -227,15 +149,36 @@ void Program::End()
     glfwTerminate();
     for (auto d : textures)
     {
-        const GLuint t = d.second;
-        glDeleteTextures(1, &t);
+        glDeleteTextures(1, &d.second);
     }
+    textures.clear();
+
+    for (auto d : shaders)
+    {
+        glDeleteShader(d.second);
+    }
+    shaders.clear();
+
+    for (auto d : buffers)
+    {
+        glDeleteBuffers(1, &d.second);
+    }
+    buffers.clear();
+
+    for (auto d : programs)
+    {
+        glDeleteProgram(d.second);
+    }
+    programs.clear();
+
+    //glDeleteProgram()
     EndGUI();
 }
 
 void Program::Draw()
 {
     Clear();
+    Render();
     UpdateTexture();
 }
 
@@ -243,6 +186,7 @@ void Program::InitShader()
 {
     GLuint vertexShader;
     GLuint fragmentShader;
+    GLuint shaderProgram;
 
     vertexShader = glCreateShader(GL_VERTEX_SHADER);
     fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -264,11 +208,17 @@ void Program::InitShader()
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
+
+    shaders[Shaders::Vertex] = vertexShader;
+    shaders[Shaders::Fragment] = fragmentShader;
+    programs[Programs::ShaderProgram] = shaderProgram;
 }
 
 void Program::InitComputeShader()
 {
     {
+        GLuint rendererShader;
+        GLuint rendererProgram;
         rendererShader = glCreateShader(GL_COMPUTE_SHADER);
         std::string computeSource = LoadFileAsString("Renderer.comp");
         const char* computeC = computeSource.c_str();
@@ -279,17 +229,13 @@ void Program::InitComputeShader()
         glAttachShader(rendererProgram, rendererShader);
         glLinkProgram(rendererProgram);
 
-        GLchar errorLog[512];
-        GLint success = 0;
-        glGetShaderiv(rendererShader, GL_COMPILE_STATUS, &success);
-        if (!success)
-        {
-            glGetShaderInfoLog(rendererShader, 512, nullptr, errorLog);
-            std::cout << errorLog << std::endl;
-        }
+        shaders[Shaders::Renderer] = rendererShader;
+        programs[Programs::Renderer] = rendererProgram;
     }
 
     {
+        GLuint clearShader;
+        GLuint clearProgram;
         clearShader = glCreateShader(GL_COMPUTE_SHADER);
         std::string clearSource = LoadFileAsString("Clear.comp");
         const char* clearC = clearSource.c_str();
@@ -300,20 +246,15 @@ void Program::InitComputeShader()
         glAttachShader(clearProgram, clearShader);
         glLinkProgram(clearProgram);
 
-        GLchar errorLog[512];
-        GLint success = 0;
-        glGetShaderiv(rendererShader, GL_COMPILE_STATUS, &success);
-        if (!success)
-        {
-            glGetShaderInfoLog(rendererShader, 512, nullptr, errorLog);
-            std::cout << errorLog << std::endl;
-        }
+        shaders[Shaders::Clear] = clearShader;
+        programs[Programs::Clear] = clearProgram;
     }
 
 }
 
 void Program::InitQuad()
 {
+    GLuint quadBuffer;
     glGenBuffers(1, &quadBuffer);
 
     float vertexPositionData[] = {
@@ -329,14 +270,20 @@ void Program::InitQuad()
     glBindBuffer(GL_ARRAY_BUFFER, quadBuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 12, vertexPositionData, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
+    buffers[Buffers::Quad] = quadBuffer;
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void Program::InitSSBO()
 {
+    GLuint vertexBuffer, indexBuffer, depthBuffer;
     glGenBuffers(1, &vertexBuffer);
     glGenBuffers(1, &indexBuffer);
     glGenBuffers(1, &depthBuffer);
+
+    buffers[Buffers::Vertex] = vertexBuffer;
+    buffers[Buffers::Index] = indexBuffer;
+    buffers[Buffers::Depth] = depthBuffer;
 
     //glUseProgram(clearProgram);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, depthBuffer);
@@ -348,16 +295,18 @@ void Program::InitSSBO()
 
 void Program::InitTexture()
 {
+    GLuint frameBufferTexture;
     glGenTextures(1, &frameBufferTexture);
     glBindTexture(GL_TEXTURE_2D, frameBufferTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, frameBuffer.data());
     glTextureParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTextureParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glGenerateMipmap(GL_TEXTURE_2D);
+    textures[Textures::FrameBufferTexture] = frameBufferTexture;
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void Program::LoadTexture(std::string name, std::string path)
+void Program::LoadTexture(Textures texture, std::string path)
 {
     int width, height, channels;
     unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 4);
@@ -369,12 +318,15 @@ void Program::LoadTexture(std::string name, std::string path)
     glTextureParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glGenerateMipmap(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, 0);
-    textures[name] = textureID;
+    textures[texture] = textureID;
     stbi_image_free(data);
 }
 
 void Program::UpdateTexture()
 {
+    GLuint shaderProgram = programs[Programs::ShaderProgram];
+    GLuint frameBufferTexture = textures[Textures::FrameBufferTexture];
+    GLuint quadBuffer = buffers[Buffers::Quad];
     glUseProgram(shaderProgram);
     glBindTexture(GL_TEXTURE_2D, frameBufferTexture);
     glUniform1i(glGetUniformLocation(shaderProgram, "screen"), 0);
@@ -416,8 +368,109 @@ void Program::SetPixel(int x, int y, glm::vec4 color)
 
 void Program::Clear()
 {
-    //std::fill(frameBuffer.begin(), frameBuffer.end(), clearColor);
-    //std::fill(depthBufferV.begin(), depthBufferV.end(), Depth(INFINITY));
+    glClear(GL_COLOR_BUFFER_BIT);
+    {
+        GLuint clearProgram = programs[Programs::Clear];
+        GLuint frameBufferTexture = textures[Textures::FrameBufferTexture];
+        GLuint depthBuffer = buffers[Buffers::Depth];
+        glUseProgram(clearProgram);
+        int operations = w * h;
+        int processes = 8 * 8;
+        int dimension = ceil(sqrt(operations / processes));
+        glUniform1i(glGetUniformLocation(clearProgram, "dimension"), dimension);
+        glBindImageTexture(0, frameBufferTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, depthBuffer);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, depthBuffer);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glDispatchCompute(dimension, dimension, 1);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    }
+}
+
+void Program::Render()
+{
+    GLuint rendererProgram = programs[Programs::Renderer];
+    GLuint frameBufferTexture = textures[Textures::FrameBufferTexture];
+    GLuint depthBuffer = buffers[Buffers::Depth];
+    GLuint vertexBuffer = buffers[Buffers::Vertex];
+    GLuint indexBuffer = buffers[Buffers::Index];
+    GLuint diffuseTexture = textures[Textures::DiffuseTexture];
+    GLuint normalTexture = textures[Textures::NormalTexture];
+    GLuint specularTexture = textures[Textures::SpecularTexture];
+    glUseProgram(rendererProgram);
+    // this can be done in another compute shader
+    glBindImageTexture(0, frameBufferTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+
+    glBindTexture(GL_TEXTURE_2D, diffuseTexture);
+    glad_glBindTextureUnit(1, diffuseTexture);
+    glUniform1i(glGetUniformLocation(rendererProgram, "diffuseTexture"), 1);
+
+    glBindTexture(GL_TEXTURE_2D, specularTexture);
+    glad_glBindTextureUnit(2, specularTexture);
+    glUniform1i(glGetUniformLocation(rendererProgram, "specularTexture"), 2);
+
+    glBindTexture(GL_TEXTURE_2D, normalTexture);
+    glad_glBindTextureUnit(3, normalTexture);
+    glUniform1i(glGetUniformLocation(rendererProgram, "normalTexture"), 3);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    for (int i = 0; i < lights.size(); i++)
+    {
+        std::string s = "lights[";
+        s += std::to_string(i);
+        s += "].position";
+        glUniform3fv(glGetUniformLocation(rendererProgram, s.c_str()), 1, &lights[i].position.x);
+        s = "lights[";
+        s += std::to_string(i);
+        s += "].intensity";
+        glUniform3fv(glGetUniformLocation(rendererProgram, s.c_str()), 1, &lights[i].intensity.x);
+    }
+    glUniform1i(glGetUniformLocation(rendererProgram, "lightCount"), lights.size());
+
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, depthBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, depthBuffer);
+
+    for (int i = 0; i < models.size(); i++)
+    {
+        glm::vec3 eyePos = transform;
+        glUniform3fv(glGetUniformLocation(rendererProgram, "eyePosition"), 1, &eyePos.x);
+
+        glm::mat4 model = GetModelMatrix(angles);
+        glUniformMatrix4fv(glGetUniformLocation(rendererProgram, "model"), 1, GL_FALSE, &model[0][0]);
+        glm::mat4 view = GetViewMatrix(eyePos);
+        glUniformMatrix4fv(glGetUniformLocation(rendererProgram, "view"), 1, GL_FALSE, &view[0][0]);
+        glm::mat4 projection = GetProjectionMatrix(45, (float)w / (float)h, 0.1, 50);
+        glUniformMatrix4fv(glGetUniformLocation(rendererProgram, "projection"), 1, GL_FALSE, &projection[0][0]);
+
+        glm::ivec2 size = glm::ivec2(w, h);
+        glUniform2iv(glGetUniformLocation(rendererProgram, "size"), 1, &size.x);
+
+        for (int j = 0; j < models[i]->meshes.size(); j++)
+        {
+            //glBindImageTexture(1, depthBufferTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+            int operations = models[i]->meshes[j].indices.size() / 3;
+            int processes = 8 * 8;
+            int dimension = ceil(sqrt(operations / processes));
+            //std::cout << operations << std::endl;
+            glUniform1i(glGetUniformLocation(rendererProgram, "dimension"), dimension);
+
+            //std::cout << dimension << std::endl;
+
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, vertexBuffer);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Vertex) * models[i]->meshes[j].vertices.size(), &models[i]->meshes[j].vertices[0], GL_STATIC_DRAW); //sizeof(data) only works for statically sized C/C++ arrays.
+
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, indexBuffer);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Index) * models[i]->meshes[j].indices.size(), &models[i]->meshes[j].indices[0], GL_STATIC_DRAW); //sizeof(data) only works for statically sized C/C++ arrays.
+
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, vertexBuffer);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, indexBuffer);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
+            glDispatchCompute(dimension, dimension, 1);
+        }
+    }
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
 }
 
 void Program::InitGUI()

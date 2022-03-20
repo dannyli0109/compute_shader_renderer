@@ -292,10 +292,10 @@ void Resterise(in VertexShaderPayload v[3])
 					vec3 ka = vec3(0.005, 0.005, 0.005);
 					vec3 ai = vec3(10, 10, 10);
 					vec3 la = ka * ai;
+					vec3 kd = texture(diffuseTexture, uv).xyz;
 					for (int i = 0; i < lightCount; i++)
 					{
 						// diffuse
-						vec3 kd = texture(diffuseTexture, uv).xyz;
 						vec3 lightPos = lights[i].position;
 						vec3 toLight = normalize(lightPos - modelPos);
 						float d2 = dot(lightPos - modelPos, lightPos - modelPos);

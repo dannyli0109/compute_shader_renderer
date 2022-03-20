@@ -5,6 +5,40 @@
 #include <vector>
 #include <iostream>
 #include <unordered_map>
+
+
+enum class Shaders
+{
+	Vertex,
+	Fragment,
+	Renderer,
+	Clear
+};
+
+enum class Programs
+{
+	ShaderProgram,
+	Renderer,
+	Clear
+};
+
+enum class Textures
+{
+	ScreenTexture,
+	DiffuseTexture,
+	NormalTexture,
+	SpecularTexture,
+	FrameBufferTexture
+};
+
+enum class Buffers
+{
+	Quad,
+	Vertex,
+	Index,
+	Depth
+};
+
 struct Vertex
 {
 	glm::vec4 position;
@@ -65,14 +99,15 @@ private:
 	void InitQuad();
 	void InitSSBO();
 	void InitTexture();
-	void LoadTexture(std::string name, std::string path);
+	void LoadTexture(Textures texture, std::string path);
 	void UpdateTexture();
 	void InitFrameBuffer(int width, int height);
 	void InitModes();
 	void SetPixel(int x, int y, glm::vec4 color);
 	void Clear();
+	void Render();
 	GLFWwindow* window;
-	GLuint shaderProgram;
+	/*GLuint shaderProgram;
 
 	GLuint clearProgram;
 	GLuint clearShader;
@@ -82,16 +117,22 @@ private:
 	GLuint quadBuffer;
 	GLuint frameBufferTexture;
 	GLuint diffuseTexture;
-	//GLuint depthBufferTexture;
+
 	GLuint ssbo;
 	GLuint depthBuffer;
+
+	GLuint vertexBuffer;
+	GLuint indexBuffer;*/
 	std::vector<glm::vec4> frameBuffer;
 	std::vector<Depth> depthBufferV;
 	int w, h;
+	int angles = 0;
+	glm::vec3 transform = glm::vec3(0.0f, 5.0f, 30.0f);
 	glm::vec4 clearColor{ 0, 0, 0, 1 };
 	std::vector<Model*> models;
-	GLuint vertexBuffer;
-	GLuint indexBuffer;
-	std::unordered_map<std::string, GLuint> textures;
+	std::unordered_map<Textures, GLuint> textures;
+	std::unordered_map<Programs, GLuint> programs;
+	std::unordered_map<Shaders, GLuint> shaders;
+	std::unordered_map<Buffers, GLuint> buffers;
 	std::vector<Light> lights;
 };

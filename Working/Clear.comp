@@ -15,7 +15,6 @@ layout(std430, binding = 1) buffer dep {
 
 uniform int dimension;
 
-
 void main()
 {
     uvec3 id = gl_GlobalInvocationID;
